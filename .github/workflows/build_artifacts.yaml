@@ -1,0 +1,113 @@
+name: build_artifacts
+on:
+  workflow_dispatch:
+    inputs:
+      opendal_core_version:
+        description: "Version of Apache OpenDAL Core"
+        required: true
+        type: string
+      opendal_go_version:
+        description: "Version of Apache OpenDAL Go Binding"
+        required: false
+        type: string
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: set-matrix
+        name: Setup Matrix
+        run: |
+          MATRIX=$(yq -o=json -I=0 "." .github/scripts/matrix.yaml | sed 's/ //g')
+          echo "Matrix:"
+          echo "$MATRIX" | jq .
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+  build:
+    needs: [ matrix ]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: "apache/opendal"
+          ref: ${{ inputs.opendal_core_version }}
+      - uses: actions/checkout@v4
+        with:
+          path: "tools"
+      - name: Setup Rust toolchain
+        uses: ./.github/actions/setup
+      - name: Setup Target
+        env:
+          TARGET: ${{ matrix.build.target }}
+        run: rustup target add $TARGET
+      - name: Setup AArch64 Tool
+        working-directory: bindings/c
+        if: ${{ matrix.build.target == 'aarch64-unknown-linux-gnu' }}
+        run: |
+          sudo apt update
+          sudo apt install gcc-aarch64-linux-gnu -y
+          mkdir .cargo
+          cat << EOF > .cargo/config.toml
+          [target.aarch64-unknown-linux-gnu]
+          linker = "aarch64-linux-gnu-gcc"
+          EOF
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Setup Service
+        env:
+          OPENDAL_FEATURES: "layers-blocking,services-${{ matrix.service }}"
+        run: |
+          python -m pip install toml
+          python tools/.github/scripts/setup_features.py
+      - name: Build ${{ matrix.service }} ${{ matrix.build.target }}
+        working-directory: bindings/c
+        env:
+          SERVICE: ${{ matrix.service }}
+          TARGET: ${{ matrix.build.target }}
+          CC: ${{ matrix.build.cc }}
+        run: |
+          cargo build --target $TARGET  --release
+          sudo apt install zstd
+          zstd -22 ./target/$TARGET/release/libopendal_c.so -o ./libopendal_c.$TARGET.so.zst
+      - uses: actions/upload-artifact@v4
+        with:
+          name: "libopendal_c_${{ inputs.opendal_core_version }}_${{ matrix.service }}_${{ matrix.build.target }}"
+          if-no-files-found: "error"
+          path: "bindings/c/libopendal_c.${{ matrix.build.target }}.so.zst"
+          overwrite: "true"
+  generate:
+    needs: [ matrix, build ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+      - uses: actions/download-artifact@v4
+      - name: Generate Template
+        env:
+          MATRIX: ${{ needs.matrix.outputs.matrix }}
+          VERSION: ${{ inputs.opendal_core_version }}
+        working-directory: generate
+        run: |
+          go run generate.go
+      - name: Auto Commit
+        env:
+          VERSION: ${{ inputs.opendal_core_version }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.name "Github Actions"
+          git config --global user.email "actions@github.com"
+          git add -A
+          git commit -m "Auto commit by GitHub Actions $VERSION"
+          git push -f --set-upstream origin main
+      - name: Auto Tag
+        if: ${{ inputs.opendal_go_version != '' }}
+        env:
+          TAG: ${{ inputs.opendal_go_version }}
+        run: |
+          git tag $TAG
+          git push -f origin $TAG
