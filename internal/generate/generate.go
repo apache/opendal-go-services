@@ -26,7 +26,8 @@ var (
 	matrix  Matrix
 	version string
 
-	tpls = template.Must(template.ParseGlob("templates/*.tpl"))
+	tpls      = template.Must(template.ParseGlob("templates/*.tpl"))
+	workspace = os.Getenv("GITHUB_WORKSPACE")
 )
 
 func init() {
@@ -36,7 +37,7 @@ func init() {
 
 func genGoFile(build Build, service string) error {
 	pkg := strings.ReplaceAll(service, "-", "_")
-	pkgPath := fmt.Sprintf("../%s", pkg)
+	pkgPath := fmt.Sprintf("%s/%s", workspace, pkg)
 
 	_, err := os.Stat(pkgPath)
 	if os.IsNotExist(err) {
@@ -47,8 +48,8 @@ func genGoFile(build Build, service string) error {
 	}
 
 	err = os.Rename(
-		fmt.Sprintf("../libopendal_c_%s_%s_%s/libopendal_c.%s.so.zst", version, service, build.Target, build.Target),
-		fmt.Sprintf("../%s/libopendal_c.%s.%s.so.zst", pkg, build.GOOS, build.GOARCH))
+		fmt.Sprintf("%s/libopendal_c_%s_%s_%s/libopendal_c.%s.so.zst", workspace, version, service, build.Target, build.Target),
+		fmt.Sprintf("%s/%s/libopendal_c.%s.%s.so.zst", workspace, pkg, build.GOOS, build.GOARCH))
 	if err != nil {
 		return err
 	}
@@ -63,7 +64,7 @@ func genGoFile(build Build, service string) error {
 		if err != nil {
 			return fmt.Errorf("parse filename: %s:%s", t.Name(), err)
 		}
-		targetFile := fmt.Sprintf("../%s/%s", pkg, strings.Trim(buf.String(), ".tpl"))
+		targetFile := fmt.Sprintf("%s/%s/%s", workspace, pkg, strings.Trim(buf.String(), ".tpl"))
 		os.Remove(targetFile)
 
 		file, err := os.OpenFile(targetFile, os.O_CREATE|os.O_WRONLY, os.ModePerm)

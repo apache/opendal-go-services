@@ -91,7 +91,7 @@ jobs:
         env:
           MATRIX: ${{ needs.matrix.outputs.matrix }}
           VERSION: ${{ inputs.opendal_core_version }}
-        working-directory: generate
+        working-directory: internal/generate
         run: |
           go run generate.go
       - name: Auto Commit
