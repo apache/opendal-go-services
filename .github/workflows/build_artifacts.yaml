@@ -106,10 +106,22 @@ jobs:
           git add -A
           git commit --allow-empty -m "Auto commit by GitHub Actions $VERSION"
           git push -f --set-upstream origin main
+  tag:
+    needs: [ matrix, build, generate ]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.matrix.outputs.matrix).service }}
+    steps:
+      - uses: actions/checkout@v4
       - name: Auto Tag
         if: ${{ inputs.opendal_go_version != '' || github.event.client_payload.opendal_go_version != '' }}
         env:
-          TAG: ${{ inputs.opendal_go_version || github.event.client_payload.opendal_go_version }}
+          SERVICE: ${{ matrix.service }} 
+          VERSION: ${{ inputs.opendal_go_version || github.event.client_payload.opendal_go_version }}
         run: |
+          SERVICE=$(echo $SERVICE | tr '-' '_')
+          TAG="$SERVICE/$VERSION"
           git tag $TAG
           git push -f origin $TAG
