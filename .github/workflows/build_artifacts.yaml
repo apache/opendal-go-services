@@ -1,5 +1,7 @@
 name: build_artifacts
 on:
+  repository_dispatch:
+    types: [ build ]
   workflow_dispatch:
     inputs:
       opendal_core_version:
@@ -34,7 +36,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: "apache/opendal"
-          ref: ${{ inputs.opendal_core_version }}
+          ref: ${{ inputs.opendal_core_version || github.event.client_payload.opendal_core_version }}
       - uses: actions/checkout@v4
         with:
           path: "tools"
@@ -76,7 +78,7 @@ jobs:
           zstd -22 ./target/$TARGET/release/libopendal_c.so -o ./libopendal_c.$TARGET.so.zst
       - uses: actions/upload-artifact@v4
         with:
-          name: "libopendal_c_${{ inputs.opendal_core_version }}_${{ matrix.service }}_${{ matrix.build.target }}"
+          name: "libopendal_c_${{ inputs.opendal_core_version || github.event.client_payload.opendal_core_version }}_${{ matrix.service }}_${{ matrix.build.target }}"
           if-no-files-found: "error"
           path: "bindings/c/libopendal_c.${{ matrix.build.target }}.so.zst"
           overwrite: "true"
@@ -90,24 +92,24 @@ jobs:
       - name: Generate Template
         env:
           MATRIX: ${{ needs.matrix.outputs.matrix }}
-          VERSION: ${{ inputs.opendal_core_version }}
+          VERSION: ${{ inputs.opendal_core_version || github.event.client_payload.opendal_core_version }}
         working-directory: internal/generate
         run: |
           go run generate.go
       - name: Auto Commit
         env:
-          VERSION: ${{ inputs.opendal_core_version }}
+          VERSION: ${{ inputs.opendal_core_version || github.event.client_payload.opendal_core_version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --global user.name "Github Actions"
           git config --global user.email "actions@github.com"
           git add -A
-          git commit -m "Auto commit by GitHub Actions $VERSION"
+          git commit --allow-empty -m "Auto commit by GitHub Actions $VERSION"
           git push -f --set-upstream origin main
       - name: Auto Tag
-        if: ${{ inputs.opendal_go_version != '' }}
+        if: ${{ inputs.opendal_go_version != '' || github.event.client_payload.opendal_go_version != '' }}
         env:
-          TAG: ${{ inputs.opendal_go_version }}
+          TAG: ${{ inputs.opendal_go_version || github.event.client_payload.opendal_go_version }}
         run: |
           git tag $TAG
           git push -f origin $TAG
