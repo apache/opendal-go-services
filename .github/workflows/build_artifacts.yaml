@@ -141,6 +141,8 @@ jobs:
         service: ${{ fromJson(needs.matrix.outputs.matrix).service }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version_check.outputs.opendal_go_version }}
       - name: Auto Service Tag
         env:
           SERVICE: ${{ matrix.service }} 
