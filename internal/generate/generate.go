@@ -47,9 +47,17 @@ func genGoFile(build Build, service string) error {
 		}
 	}
 
+	var so string
+	if build.GOOS == "darwin" {
+		so = "dylib"
+	} else if build.GOOS == "linux" {
+		so = "so"
+	} else {
+		so = "dll"
+	}
 	err = os.Rename(
-		fmt.Sprintf("%s/libopendal_c_%s_%s_%s/libopendal_c.%s.so.zst", workspace, version, service, build.Target, build.Target),
-		fmt.Sprintf("%s/%s/libopendal_c.%s.%s.so.zst", workspace, pkg, build.GOOS, build.GOARCH))
+		fmt.Sprintf("%s/libopendal_c_%s_%s_%s/libopendal_c.%s.%s.zst", workspace, version, service, build.Target, build.Target, so),
+		fmt.Sprintf("%s/%s/libopendal_c.%s.%s.%s.zst", workspace, pkg, build.GOOS, build.GOARCH, so))
 	if err != nil {
 		return err
 	}
@@ -77,6 +85,7 @@ func genGoFile(build Build, service string) error {
 			"pkg":  pkg,
 			"os":   build.GOOS,
 			"arch": build.GOARCH,
+			"so":   so,
 		}); err != nil {
 			return fmt.Errorf("execute template: %s: %s", t.Name(), err)
 		}

@@ -21,5 +21,5 @@ package {{.pkg}}
 
 import _ "embed"
 
-//go:embed libopendal_c.{{.os}}.{{.arch}}.so.zst
+//go:embed libopendal_c.{{.os}}.{{.arch}}.{{.so}}.zst
 var libopendalZst []byte

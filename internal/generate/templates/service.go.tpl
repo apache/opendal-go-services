@@ -61,7 +61,7 @@ func load() error {
 	if err != nil {
 		return err
 	}
-	path, err = writeTempExec("libopendal_c*.so", data)
+	path, err = writeTempExec("libopendal_c*.{{.so}}", data)
 	if err != nil {
 		return err
 	}
