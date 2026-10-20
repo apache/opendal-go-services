@@ -1,9 +1,9 @@
 module github.com/apache/opendal-go-services/memory
 
-go 1.22.4
+go 1.24
 
 require (
-	github.com/klauspost/compress v1.17.9
+	github.com/klauspost/compress v1.18.7
 	github.com/stretchr/testify v1.9.0
 )
 
