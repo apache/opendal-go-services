@@ -92,11 +92,11 @@ func genGoFile(build Build, service string) error {
 	}
 	cmd := exec.Command("go", "mod", "tidy")
 	cmd.Dir = pkgPath
-	output, err := cmd.Output()
-	if err != nil {
-		return err
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("go mod tidy in %s: %w", pkgPath, err)
 	}
-	fmt.Printf("%s\n", output)
 	return nil
 }
 
