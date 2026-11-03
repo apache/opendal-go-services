@@ -74,8 +74,23 @@ def replay(label, revision, child_exit):
             PROBE_STDERR=STDERR_MARKER,
             PROBE_EXIT=str(child_exit),
         )
+        binary = root / "generator"
+        build_env = env.copy()
+        build_env["PATH"] = os.environ["PATH"]
+        build = subprocess.run(
+            [GO, "build", "-o", str(binary), "generate.go"],
+            cwd=root / "internal/generate",
+            env=build_env,
+            capture_output=True,
+            text=True,
+        )
+        (LOG_DIR / f"{label}.build.stdout").write_text(build.stdout)
+        (LOG_DIR / f"{label}.build.stderr").write_text(build.stderr)
+        (LOG_DIR / f"{label}.build.exit").write_text(f"{build.returncode}\n")
+        assert build.returncode == 0, (label, build.stderr)
+        # go run prepends GOROOT/bin to PATH, hiding the controlled tidy child.
         result = subprocess.run(
-            [GO, "run", "generate.go"],
+            [str(binary)],
             cwd=root / "internal/generate",
             env=env,
             capture_output=True,
@@ -106,6 +121,7 @@ def replay(label, revision, child_exit):
         assert outputs, label
         return {
             "revision": revision,
+            "build_exit": build.returncode,
             "exit": result.returncode,
             "controlled_child_exit": child_exit,
             "stdout_visible": STDOUT_MARKER in result.stdout,
@@ -124,6 +140,7 @@ assert results["baseline_success"]["output_files"] == results["fixed_success"]["
 results["go_version"] = subprocess.run(
     [GO, "version"], check=True, capture_output=True, text=True
 ).stdout.strip()
+results["execution"] = "Go build followed by direct generator binary execution"
 results["status"] = "four generator CLI replays passed"
 (LOG_DIR / "results.json").write_text(json.dumps(results, indent=2) + "\n")
 print(json.dumps(results, indent=2))
